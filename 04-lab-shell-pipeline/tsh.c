@@ -101,10 +101,167 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+	char *argv[MAXARGS];
+	int argc = parseline(cmdline, argv);
+	if (argc <= 0) {
+	}
+
+	int cmds[MAXARGS];
+	int stdin_r[MAXARGS];
+	int stdout_r[MAXARGS];
+	int num_cmds = parseargs(argv, cmds, stdin_r, stdout_r);
+	int prev_pipefd[2] = {-1, -1};
+	int next_pipefd[2] = {-1, -1};
+	int first_child;
+	int child_pid[num_cmds];
+
+	for (int i = 0; i < num_cmds; i++) {
+		int is_bcmd = builtin_cmd(argv);
+		if (is_bcmd != 0) {
+			printf("builtin_cmd test returned nonzero: %d", is_bcmd);
+		}
+
+
+		if (num_cmds > 1) {
+			if (i > 0) {
+				prev_pipefd[0] = next_pipefd[0];
+				prev_pipefd[1] = next_pipefd[1];
+			}
+
+			if (i < num_cmds - 1) {
+				int pipe_r = pipe(next_pipefd);
+				if (pipe_r < 0) {
+					perror("pipe");
+					exit(0);
+				}
+			}
+
+		}
+
+		int child = fork();
+		if (child < 0) {
+			perror("fork");
+			exit(0);
+		}
+
+		else if (child > 0) {
+			int setpgid_r;
+			if (i == 0) {
+				setpgid_r = setpgid(child, child);
+			}
+			else {
+				setpgid_r = setpgid(child, first_child);
+			}
+
+			if (setpgid_r < 0) {
+				perror("setpgid child");
+				exit(0);
+			}
+		}
+
+		if (child == 0) {
+			if (stdin_r[i] > -1) {
+				int new_infile = fileno(fopen(argv[stdin_r[i]], "r"));
+				int dup_r = dup2(new_infile, STDIN_FILENO);
+				if (dup_r < 0) {
+					perror("Duplicate FD");
+					exit(0);
+				}
+				int close_r = close(new_infile);
+				if (close_r < 0) {
+					perror("Close FD");
+					exit(0);
+				}
+			}
+
+			if (stdout_r[i] > -1) {
+				int new_outfile = fileno(fopen(argv[stdout_r[i]], "w"));
+				int dup_r = dup2(new_outfile, STDOUT_FILENO);
+				if (dup_r < 0) {
+					perror("Duplicate FD");
+					exit(0);
+				}
+				int close_r = close(new_outfile);
+				if (close_r < 0) {
+					perror("Close FD");
+					exit(0);
+				}
+			}
+
+			if (num_cmds > 1) {
+				if (i > 0) {
+					int dup_r = dup2(prev_pipefd[0], STDIN_FILENO);
+					if (dup_r < 0) {
+						perror("Duplicate pipe read FD");
+						exit(0);
+					}
+					int close_r = close(prev_pipefd[0]);
+					printf("closing read end");
+					if (close_r < 0) {
+						perror("Close pipe read FD");
+						exit(0);
+					}
+					int close_r_w = close(prev_pipefd[1]);
+					if (close_r_w < 0) {
+						perror("close pipe read fd");
+						exit(0);
+					}
+
+				}
+				if (i < num_cmds - 1) {
+					int dup_r = dup2(next_pipefd[1], STDOUT_FILENO);
+					if (dup_r < 0) {
+						perror("Duplicate pipe write FD");
+						exit(0);
+					}
+					int close_r1 = close(next_pipefd[1]);
+					printf("closing write end");
+					if (close_r1 < 0) {
+						perror("Close pipe write fd");
+						exit(0);
+					}
+					int close_r2 = close(next_pipefd[0]);
+					if (close_r2 < 0) {
+						perror("close pipe read fd");
+						exit(0);
+					}
+				}
+			}
+			int exec_r = execve(argv[cmds[i]], &argv[cmds[i]], environ);
+			if (exec_r < 0) {
+				perror("Execute command");
+				exit(0);
+			}
+		}
+
+		else {
+			if (i == 0) {
+				first_child = child;
+			}
+			if (num_cmds > 1 && i > 0) {
+				int close_r1 = close(prev_pipefd[0]);
+				if (close_r1 < 0) {
+					perror("close parent pipe read end");
+				}
+				int close_r2 = close(prev_pipefd[1]);
+				if (close_r2 < 0) {
+					perror("close parent pipe write end");
+				}
+			}
+
+			child_pid[i] = child;
+		}
+	}
+
+	for (int i = 0; i < num_cmds; i++) {
+		waitpid(child_pid[i], NULL, 0);
+	}
+
+
 	return;
 }
 
-/* 
+/*
  * parseargs - Parse the arguments to identify pipelined commands
  * 
  * Walk through each of the arguments to find each pipelined command.  If the
@@ -228,6 +385,10 @@ int parseline(const char *cmdline, char **argv)
  */
 int builtin_cmd(char **argv) 
 {
+	if (!strcmp(argv[0], "quit")){
+		exit(0);
+	}
+
 	return 0;     /* not a builtin command */
 }
 
