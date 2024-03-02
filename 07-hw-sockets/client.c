@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
 	// was passed in on the command line.
 	hints.ai_family = af;
 	// Use type SOCK_DGRAM (UDP)
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = SOCK_STREAM;
 
 
 	/* SECTION A - pre-socket setup; getaddrinfo() */
@@ -150,12 +150,52 @@ int main(int argc, char *argv[]) {
 	fprintf(stderr, "Local socket info: %s:%d (addr family: %d)\n",
 			local_ip, local_port, addr_fam);
 
+	char buffer[4096];
+	int total_read = 0;
+	int bytes_read = 0;
+	do {
+		bytes_read = fread(buffer + total_read, 1, 512, stdin);
+		total_read += bytes_read;
+	} while(bytes_read == 512 && total_read <= 4096);
+
+	int total_sent = 0;
+	int bytes_sent = 0;
+	do {
+		if (total_read - total_sent < 512) {
+			bytes_sent = write(sfd, buffer + total_sent, total_read - total_sent);
+		}
+		else {
+			bytes_sent = write(sfd, buffer + total_sent, 512);
+		}
+		if (bytes_sent < 0) {
+			break;
+		}
+		total_sent += bytes_sent;
+	} while(bytes_sent == 512 && total_sent <= total_read);
+//	printf("writing\n");
+
+	char rbuffer[16384];
+	int rtotal_read = 0;
+	int rbytes_read = 0;
+	do {
+		rbytes_read = recv(sfd, rbuffer + rtotal_read, 512, 0);
+		rtotal_read += rbytes_read;
+		if (rbytes_read <= 0){
+			break;
+		}
+	} while(rbytes_read > 0 && rtotal_read <= 16384);
+
+	int error = write(STDOUT_FILENO, rbuffer, rtotal_read);
+	if (error < 0) {
+		perror("Write http response");
+		exit(-1);
+	}
 
 	/* SECTION C - interact with server; send, receive, print messages */
 
 	// Send remaining command-line arguments as separate
 	// datagrams, and read responses from server.
-	for (int j = hostindex + 2; j < argc; j++) {
+/*	for (int j = hostindex + 2; j < argc; j++) {
 		// buf will hold the bytes we read from the socket.
 		char buf[BUF_SIZE];
 
@@ -170,22 +210,27 @@ int main(int argc, char *argv[]) {
 		}
 
 		ssize_t nwritten = send(sfd, argv[j], len, 0);
+//		addr_len = sizeof(struct sockaddr_storage);
+//		s = getsockname(sfd, local_addr, &addr_len);
+//		parse_sockaddr(local_addr, local_ip, &local_port);
+//		fprintf(stderr, "Local socket info: %s:%d (addr family: %d)\n",
+//				local_ip, local_port, addr_fam);
 		if (nwritten < 0) {
 			perror("send");
 			exit(EXIT_FAILURE);
 		}
 		printf("Sent %zd bytes: %s\n", len, argv[j]);
 
-		ssize_t nread = recv(sfd, buf, BUF_SIZE, 0);
-		buf[nread] = '\0';
-		if (nread < 0) {
-			perror("read");
-			exit(EXIT_FAILURE);
-		}
+//		ssize_t nread = recv(sfd, buf, BUF_SIZE, 0);
+//		buf[nread] = '\0';
+//		if (nread < 0) {
+//			perror("read");
+//			exit(EXIT_FAILURE);
+//		}
 
-		printf("Received %zd bytes: %s\n", nread, buf);
+//		printf("Received %zd bytes: %s\n", nread, buf);
 
 	}
-
+*/
 	exit(EXIT_SUCCESS);
 }
