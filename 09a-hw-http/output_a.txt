@@ -1,0 +1,29 @@
+*   Trying 2620:10f:3007:a002:a6bb:6dff:fe81:83cd:1025...
+* connect to 2620:10f:3007:a002:a6bb:6dff:fe81:83cd port 1025 failed: Connection refused
+*   Trying 192.168.2.152:1025...
+* Connected to nevada (192.168.2.152) port 1025 (#0)
+> GET /foo.html HTTP/1.1
+> Host: nevada:1025
+> User-Agent: curl/7.81.0
+> Accept: */*
+> 
+* Mark bundle as not supporting multiuse
+* HTTP 1.0, assume close after body
+< HTTP/1.0 200 OK
+< Server: SimpleHTTP/0.6 Python/3.10.12
+< Date: Wed, 20 Mar 2024 18:47:07 GMT
+< Content-type: text/html
+< Content-Length: 129
+< Last-Modified: Mon, 15 Jan 2024 18:31:31 GMT
+< 
+{ [129 bytes data]
+* Closing connection 0
+<html>
+	<head>
+		<title>CS 324</title>
+	</head>
+	<body>
+		<h1>CS 324</h1>
+		<img src="socket.jpg" alt="socket">
+	</body>
+</html>
