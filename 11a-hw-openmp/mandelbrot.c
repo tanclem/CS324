@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
+#include <omp.h>
 
 int main(int argc, char* argv[])
 {
@@ -80,6 +81,9 @@ int main(int argc, char* argv[])
   int k; /* Iteration counter */
   int *saved = malloc(sizeof(int)*yres*xres);
 
+  double start = omp_get_wtime();
+
+  #pragma omp parallel for private(x, y, v, i, k)
   for (j = 0; j < yres; j++) {
     y = ymax - j * dy;
     for(i = 0; i < xres; i++) {
@@ -98,6 +102,7 @@ int main(int argc, char* argv[])
       saved[xres * j + i] = k;
     }
   }
+  printf("Parallelized time: %f\n", omp_get_wtime() - start);
 
   for (j = 0; j < yres; j++) {
     for(i = 0; i < xres; i++) {
